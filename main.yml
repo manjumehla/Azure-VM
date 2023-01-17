@@ -1,0 +1,64 @@
+- name: Create Azure VM
+  hosts: localhost
+  connection: local
+  tasks:
+  - name: Create resource group
+    azure_rm_resourcegroup:
+      name: myResourceGroup
+      location: eastus
+  - name: Create virtual network
+    azure_rm_virtualnetwork:
+      resource_group: myResourceGroup
+      name: myVnet
+      address_prefixes: "10.0.0.0/16"
+  - name: Add subnet
+    azure_rm_subnet:
+      resource_group: myResourceGroup
+      name: mySubnet
+      address_prefix: "10.0.1.0/24"
+      virtual_network: myVnet
+  - name: Create public IP address
+    azure_rm_publicipaddress:
+      resource_group: myResourceGroup
+      allocation_method: Static
+      name: myPublicIP
+    register: output_ip_address
+  - name: Public IP of VM
+    debug:
+      msg: "The public IP is {{ output_ip_address.state.ip_address }}."
+  - name: Create Network Security Group that allows SSH
+    azure_rm_securitygroup:
+      resource_group: myResourceGroup
+      name: myNetworkSecurityGroup
+      rules:
+        - name: SSH
+          protocol: Tcp
+          destination_port_range: 22
+          access: Allow
+          priority: 1001
+          direction: Inbound
+  - name: Create virtual network interface card
+    azure_rm_networkinterface:
+      resource_group: myResourceGroup
+      name: myNIC
+      virtual_network: myVnet
+      subnet: mySubnet
+      public_ip_name: myPublicIP
+      security_group: myNetworkSecurityGroup
+  - name: Create VM
+    azure_rm_virtualmachine:
+      resource_group: myResourceGroup
+      name: myVM
+      vm_size: Standard_DS1_v2
+      admin_username: ansiuser
+      ssh_password_enabled: false
+      ssh_public_keys:
+        - path: /home/ansiuser/.ssh/id_rsa
+          key_data: "
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC8tSk9qYUWEMwUDVXlFmEvHaIPW4o+dkHBG0IXklHyBAs8jBlloXRGTX2qwUXqpBuvMBaZrC0bbmLwrupfwpdOMGGUznwz82v5JLqzhg1uO+orHa9V5noRGgzZilMMcY4dVf7SyhqzIAlrHg4/4IgYUrHWQ2g7D4jJHk4UM9k1V2EkVe1Iit7ontkgeI0JR9qlv0135LzLqXDLuXrLs/b4IF2akPK2pHrX1PV9iOjNfIlxUUTorckLAsx4kL1npfwfOPT8XZcAz+sUSwTgJHJ1UEddwpfnzEyI/nwoZVqIxeLVD+eIIOdWyoXYPUZucKDFsSToCMWtOs+stncXjdLr8YqngGoK8j3V76jmKLFm2oeAq7H9WoKUOSu+3jyQ7ykh/1DAJ/F7I0GGvqJPi7M2tJ0B4B5w8ngDVFj7Z0pd6r0+aUsz+yd1uzMWJMa2JDGQhPDPeeo54cnYuvrRkw4qFULknfurx3+F2Z93EJK9SM0Jxdm0Mifgr9hzl1B2a0s"
+      network_interfaces: myNIC
+      image:
+        offer: CentOS
+        publisher: OpenLogic
+        sku: '7.5'
+        version: latest
